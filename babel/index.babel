@@ -1,0 +1,358 @@
+// ---------- Import Bootstrap Components ----------
+const Button = ReactBootstrap.Button;
+const ButtonGroup = ReactBootstrap.ButtonGroup;
+const ControlLabel = ReactBootstrap.ControlLabel;
+const FormControl = ReactBootstrap.FormControl;
+const FormGroup = ReactBootstrap.FormGroup;
+const InputGroup = ReactBootstrap.InputGroup;
+const Jumbotron = ReactBootstrap.Jumbotron;
+const PageHeader = ReactBootstrap.PageHeader;
+const Modal = ReactBootstrap.Modal;
+const Panel = ReactBootstrap.Panel;
+const PanelGroup = ReactBootstrap.PanelGroup;
+const Table = ReactBootstrap.Table;
+const update = React.addons.update;
+
+// ---------- Constant variables ----------
+const STATUS = {
+	close: 'close',
+	addRecipe: 'Add recipe',
+	editRecipe: 'Edit recipe'
+};
+
+
+// Get recipes from my browser's local storage:
+var recipes = (typeof localStorage["_username_recipes"] !== 'undefined') ? JSON.parse(localStorage.getItem("_username_recipes")) : [
+	{'id': 1, 'name': 'Test', 'ingredients': [{'id': 1, 'name': 'test1'}, {'id': 2, 'name': 'test2'}]},
+	{'id': 2, 'name': 'Test1', 'ingredients': [{'id': 1, 'name': 'test1'}, {'id': 2, 'name': 'test2'}]}
+];
+
+class RecipeRow extends React.Component {
+	render() {
+		return (
+			<tr>
+				<td>{this.props.ingredient.id}</td>
+				<td>{this.props.ingredient.name}</td>
+			</tr>
+		);
+	}
+}
+
+class ActionButtons extends React.Component {
+	constructor(props) {
+		super(props);
+		this.deleteRecipe = this.deleteRecipe.bind(this);
+		this.editRecipe = this.editRecipe.bind(this);
+	}
+	deleteRecipe(e) {
+		e.stopPropagation();
+		this.props.deleteRecipe(this.props.recipeId);	
+	}
+	editRecipe(e) {
+		e.stopPropagation();
+		this.props.editRecipe(this.props.recipeId);
+	}
+	render() {
+		return (
+			<ButtonGroup> 
+				<Button bsStyle="warning" bsSize="small" onClick={this.editRecipe}>
+					<i className="fa fa-pencil" aria-hidden="true"></i>
+					<span> Edit</span>
+				</Button> 
+				<Button bsStyle="danger" bsSize="small" onClick={this.deleteRecipe}>
+					<i className="fa fa-times" aria-hidden="true"></i>
+					<span> Delete</span>
+				</Button> 
+			</ButtonGroup>
+		);
+	}	
+}
+
+class RecipeTable extends React.Component {
+	constructor(props) {
+		super(props);
+	}
+	render() {
+		var panelHeader = (
+			<div className='row'>
+				<div className='col-xs-9'>
+					{this.props.recipe.name}
+				</div>
+				<div className='col-xs-3'>
+					<ActionButtons 
+						recipeId={this.props.recipe.id} 
+						deleteRecipe={this.props.deleteRecipe}
+						editRecipe={this.props.editRecipe}
+					/>	
+				</div>
+			</div>
+		);
+		var recipeRows = [];
+		this.props.recipe.ingredients.forEach(function(ingredient) {
+			recipeRows.push(<RecipeRow ingredient={ingredient} key={ingredient.id} />);
+		});
+		return (
+			<Panel bsStyle="success" header={panelHeader} collapsible> 
+				<Table>
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Ingredients</th>
+						</tr>
+					</thead>
+					<tbody>
+						{recipeRows}
+					</tbody>
+				</Table>	
+			</Panel>
+		);
+	}
+}
+
+class RecipeModal extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			recipeName: '',
+			recipeIngredients: ''
+		};
+		this.closeModal = this.closeModal.bind(this);
+		this.handleSubmit = this.handleSubmit.bind(this);
+		this.handleRecipeNameChange = this.handleRecipeNameChange.bind(this);
+		this.handleRecipeIngredientsChange = this.handleRecipeIngredientsChange.bind(this);
+		this.setInitialState = this.setInitialState.bind(this);
+	}
+	
+	closeModal() {
+		this.props.closeModal();
+	}
+	getRecipeById(id) {
+		return this.props.recipes.filter(function( obj ) {
+  			return obj.id === id;
+		})[0];
+	}
+	getRecipeIngredients(recipe) {
+		return recipe.ingredients.map(function(a) { return a.name; }).join(',');
+	}
+	setInitialState() {
+		var id = this.props.modalRecipeId;
+		if (id !== -1) {
+			var recipe = this.getRecipeById(id);
+			var recipeName = recipe.name;
+			var recipeIngredients = this.getRecipeIngredients(recipe);
+		} else {
+			var recipeName = '';
+			var recipeIngredients = '';
+		}
+		
+		this.setState({
+			recipeName: recipeName,
+			recipeIngredients: recipeIngredients
+		});
+	}
+	
+	handleSubmit() {
+		if (this.state.recipeName === '' || this.state.recipeIngredients === '') {
+			return;
+		}
+		
+		if (this.props.modalStatus === STATUS.addRecipe) {
+			this.props.handleRecipeAdded(this.state.recipeName, this.state.recipeIngredients);
+		} else {
+			this.props.handleRecipeEdited(this.props.modalRecipeId, this.state.recipeName, this.state.recipeIngredients);
+		}
+	}
+	handleRecipeNameChange(event) {
+		this.setState({ recipeName: event.target.value });
+	}
+	handleRecipeIngredientsChange(event) {
+		this.setState({ recipeIngredients: event.target.value });
+	}
+
+    render() {
+		return (
+          	<Modal onEnter={this.setInitialState} onHide={this.closeModal} show={this.props.modalStatus !== STATUS.close}>
+          		<Modal.Header closeButton>
+               		<Modal.Title>{this.props.modalStatus}</Modal.Title>
+           		</Modal.Header>
+					
+				<Modal.Body>
+					<FormGroup>
+						<ControlLabel>Recipe Name: </ControlLabel>
+						<FormControl value={this.state.recipeName} onChange={this.handleRecipeNameChange}></FormControl>
+					</FormGroup>
+					<FormGroup>
+						<ControlLabel>Ingredients: </ControlLabel>
+						<FormControl componentClass="textarea" className="ingredients-input" placeholder="Enter ingredinets separated by comma"  value={this.state.recipeIngredients} onChange={this.handleRecipeIngredientsChange}></FormControl>
+					</FormGroup>
+				</Modal.Body>
+					
+				<Modal.Footer>
+					<Button bsStyle='danger' onClick={this.closeModal}>Cancel</Button>
+					<Button bsStyle='success' onClick={this.handleSubmit}>Submit</Button>
+				</Modal.Footer>
+          	</Modal>
+		);
+	}
+}
+
+class RecipeBox extends React.Component {
+	constructor(props) {
+		super(props);
+		this.state = {
+			modalStatus: STATUS.close,
+			modalRecipeId: -1,
+			recipes: this.props.recipes
+		};
+     	this.closeModal = this.closeModal.bind(this);
+		this.openModalInAddMode = this.openModalInAddMode.bind(this);
+		this.openModalInEditMode = this.openModalInEditMode.bind(this);
+		this.handleRecipeAdded = this.handleRecipeAdded.bind(this);
+		this.handleRecipeDeleted = this.handleRecipeDeleted.bind(this);
+		this.handleRecipeEdited = this.handleRecipeEdited.bind(this);
+	}
+
+	/* Helper functions */
+	getLastRecipeId() {
+		var recipes = this.state.recipes;
+		if (recipes[recipes.length-1]) {
+			return recipes[recipes.length-1].id;
+		} else {
+			return -1;
+		}
+	}
+	getRecipeIndex(id) {
+		return this.state.recipes.findIndex(function(recipe) {
+			return recipe.id === id;
+		});
+	}
+	getRecipeById(id) {
+		return this.state.recipes.filter(function( obj ) {
+  			return obj.id === id;
+		})[0];
+	}
+	
+	/* Open or close the modal */
+	closeModal() {
+		this.setState({
+			modalStatus: STATUS.close
+		});
+	} 
+	openModalInAddMode() {
+		this.setState({
+			modalStatus: STATUS.addRecipe,
+			modalRecipeId: -1
+		});
+	}
+	openModalInEditMode(id) {
+		this.setState({
+			modalStatus: STATUS.editRecipe,
+			modalRecipeId: id
+		});
+	}
+	
+	handleRecipeAdded(recipeName, recipeIngredients) {
+		var id = this.getLastRecipeId() + 1;
+		var newRecipe = {
+			'id': id,
+			'name': recipeName,
+			'ingredients': []
+		};
+		var ingredientsArr = recipeIngredients.split(',');
+		for (var i = 0; i < ingredientsArr.length; i++) {
+			newRecipe.ingredients.push(
+				{'id': i + 1, 'name': ingredientsArr[i].toString()}
+			);
+		}
+		this.setState((prevState, props) => ({
+			modalStatus: 'close',
+			recipes: prevState.recipes.concat(newRecipe)
+		}));
+		localStorage.setItem('_username_recipes', JSON.stringify(this.state.recipes));
+	}
+	handleRecipeDeleted(recipeId) {
+		var recipes = this.state.recipes;
+		this.setState((prevState, props) => ({
+			recipes: prevState.recipes.filter(function( recipe ) {
+    			return recipe.id !== recipeId;
+			})
+		}));
+		
+		localStorage.setItem('_username_recipes', JSON.stringify(recipes.filter(function(recipe) {
+    			return recipe.id !== recipeId;
+			})
+		));
+	}
+	handleRecipeEdited(recipeId, recipeName, recipeIngredients) {
+		var recipesList = this.state.recipes;
+		var recipe = this.getRecipeById(recipeId);
+		var index = this.getRecipeIndex(recipeId);
+		var ingredientsArr = recipeIngredients.split(',');
+		
+		recipe.name = recipeName;
+		recipe.ingredients = [];
+		for (var i = 0; i < ingredientsArr.length; i++) {
+			recipe.ingredients.push(
+				{'id': i + 1, 'name': ingredientsArr[i].toString()}
+			);
+		}
+		
+		var updatedRecipesList = update(recipesList[index], {
+			$set: recipe
+		});
+		updatedRecipesList = update(recipesList, {
+			 $splice: [[index, 1, updatedRecipesList]]
+		});
+		
+		this.setState({
+			modalStatus: STATUS.close,
+			recipes: updatedRecipesList
+		});
+		localStorage.setItem('_username_recipes', JSON.stringify(this.state.recipes));
+	}
+	
+	render() {
+		var recipeTables = [];
+		var handleRecipeDeleted = this.handleRecipeDeleted;
+		var openModalInEditMode = this.openModalInEditMode;
+
+		this.state.recipes.forEach(function(recipe) {
+			recipeTables.push(
+				<RecipeTable 
+					recipe={recipe} 
+					deleteRecipe={handleRecipeDeleted}
+					editRecipe={openModalInEditMode}
+					key={recipe.id}
+				/>
+			);
+		});
+		return (
+			<div>
+				<div className="container">
+					<PageHeader className="title">Recipe Box</PageHeader>
+					<Jumbotron className="recipeBox">
+						<Button className="addRecipeBtn" bsStyle='primary' onClick={this.openModalInAddMode}>
+							<i className="fa fa-plus" aria-hidden="true"></i>
+							<span> Add recipe</span>
+						</Button>
+						{recipeTables}
+					</Jumbotron>
+				</div>
+				<RecipeModal
+					recipes={this.state.recipes}
+					modalStatus={this.state.modalStatus}
+					modalRecipeId={this.state.modalRecipeId}
+					handleRecipeAdded={this.handleRecipeAdded}
+					handleRecipeEdited={this.handleRecipeEdited}
+					closeModal={this.closeModal}
+				/>
+			</div>
+    	);
+  	}
+}
+
+ReactDOM.render(
+	<RecipeBox recipes={recipes}/>,
+  	document.getElementById('root')
+);
+
